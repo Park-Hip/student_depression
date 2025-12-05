@@ -6,7 +6,8 @@ from dotenv import load_dotenv
 
 # Import các module tùy chỉnh
 from integrate_llm import chat_llm
-from analysis_utils import analyze_user_vs_population
+from analysis import analyze_user_vs_population
+from make_inference import make_inference
 
 # 1. Load biến môi trường
 load_dotenv()
