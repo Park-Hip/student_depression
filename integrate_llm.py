@@ -1,18 +1,26 @@
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from dotenv import load_dotenv
+import streamlit as st
 import os
 
-load_dotenv()
+def get_api_key():
+    if "GROQ_API_KEY" in st.secrets:
+        return st.secrets["GROQ_API_KEY"]
+    elif os.getenv("GROQ_API_KEY"):
+        return os.getenv("GROQ_API_KEY")
+    else:
+        st.error("API Key not found!")
+        return None
 
-
-def chat_llm(report_text, prediction):
-    api_key = os.getenv("GROQ_API_KEY")
+def chat_llm(report_text, prediction, language="vi"):
+    api_key = get_api_key()
 
     if not api_key:
-        return "Lỗi: Không tìm thấy GROQ_API_KEY trong file .env. Vui lòng cấu hình."
+        return "Error: GROQ_API_KEY not found in .env file." if language == "en" else "Lỗi: Không tìm thấy GROQ_API_KEY trong file .env. Vui lòng cấu hình."
 
-    prompt_template = """
+    prompts = {
+        "vi": """
         VAI TRÒ CỦA BẠN:
         Bạn là "Người Bạn Đồng Hành Tâm Lý" tại một trường đại học. Bạn không phải là bác sĩ khô khan, mà là 
         một người tư vấn tâm lý cực kỳ thân thiện, vui vẻ, tích cực và thấu hiểu nỗi lòng của Gen Z.
@@ -49,7 +57,47 @@ def chat_llm(report_text, prediction):
         ghép việc "Yêu bản thân" vào lời khuyên.
         -   Đừng chỉ liệt kê số liệu, hãy biến số liệu thành câu chuyện.
         BẮT ĐẦU CÂU TRẢ LỜI NGAY DƯỚI ĐÂY:
-    """
+        """,
+        "en": """
+        YOUR ROLE:
+        You are a "Mental Health Companion" at a university. You are not a dry doctor, but a 
+        psychological counselor who is extremely friendly, cheerful, positive, and understands Gen Z.
+
+        TASK:
+        Based on the "USER VS POPULATION ANALYSIS REPORT" provided below, analyze the student's condition 
+        and provide advice.
+
+        INPUT DATA:
+        {report_text}
+
+        ANALYSIS & RESPONSE GUIDELINES:
+        1.  **Tone & Voice:**
+            -   Cheerful, warm, use natural, relatable language (emojis allowed 🌟, 💪, 😊).
+            -   Absolutely no judging or scaring.
+            -   Address as: "I" and "You".
+
+        2.  **Response Structure:**
+            -   **Greeting & "Wow" Moment:** Start with an energetic greeting. Find a bright spot in the report 
+            (e.g., high CGPA, hard work) to genuinely praise. Show them how good they are compared to the average.
+            -   **Empathetic Perspective:** Look at alarming indicators (Academic Pressure, Financial
+             Stress, Sleep Duration, Diet). Gently compare with the community so they see: "Ah, I'm pushing myself too
+              hard compared to everyone else".
+            -   *Example:* "I see you are under 77% more academic pressure than others, no wonder your GPA is sky high! 
+            But in return, your sleep and diet are 'protesting'!"
+            -   **Actionable Tips:** Give 2-3 specific, easy-to-do advice.
+            -   Combine problem-solving (e.g., Financial Stress + Unhealthy Diet -> Suggest cheap meal prep).
+            -   If there is "Family History of Mental Illness" or "Suicidal Thoughts", gently but firmly remind 
+            them to seek professional support or share with loved ones, don't carry it alone.
+            -   **Closing:** A super positive morale-boosting closing sentence.
+
+        IMPORTANT NOTES:
+        -   Don't just list numbers, turn numbers into a story.
+
+        START YOUR ANSWER BELOW:
+        """
+    }
+
+    prompt_template = prompts.get(language, prompts["en"])
 
     prompt = ChatPromptTemplate.from_template(template=prompt_template)
 
@@ -61,11 +109,15 @@ def chat_llm(report_text, prediction):
     )
     chain = prompt | llm
     try:
-        report_text = report_text + f"\n--- 3. KẾT QUẢ DỰ ĐOÁN TRẦM CẢM: {prediction} ---"
+        # Append prediction result to report text for context
+        pred_text = f"\n--- 3. KẾT QUẢ DỰ ĐOÁN TRẦM CẢM: {prediction} ---" if language == "vi" else f"\n--- 3. DEPRESSION PREDICTION RESULT: {prediction} ---"
+        report_text = report_text + pred_text
+
         response = chain.invoke({"report_text": report_text})
         return response.content
     except Exception as e:
-        return f"Xin lỗi, hệ thống đang bận. Lỗi chi tiết: {str(e)}"
+        err_msg = f"Xin lỗi, hệ thống đang bận. Lỗi chi tiết: {str(e)}" if language == "vi" else f"Sorry, system is busy. Error details: {str(e)}"
+        return err_msg
 
 
 if __name__ == "__main__":
